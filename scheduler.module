@@ -3,18 +3,18 @@
 
 function scheduler_help($section){
   if ($section == 'admin/system/modules#description') {
-    return t("A module to schedule node (un)publishing.");
+    return t('A module to schedule node (un)publishing.');
   }
 }
-  
+
 function scheduler_link($type, $node = 0, $main = 0) {
-  if ($type == "system" && user_access("administer nodes")) {
-    menu("admin/node/scheduler", t("schedule"), "scheduler_admin", 8);
-  }  
+  if ($type == 'system' && user_access('administer nodes')) {
+    menu('admin/node/scheduler', t('schedule'), 'scheduler_admin', 8);
+  }
 }
-  
+
 function scheduler_write($node, $op, $arg) {
-  if (user_access("administer nodes")) {
+  if (user_access('administer nodes')) {
 
     $conds = array();
     if ($node->scheduler_post) {
@@ -36,7 +36,7 @@ function scheduler_write($node, $op, $arg) {
       return;
     }
 
-    if ($op !== "insert") {
+    if ($op !== 'insert') {
       // Determine whether we must UPDATE or INSERT, then do it
       $result = db_query("SELECT * FROM {scheduler} WHERE nid = %d", $node->nid);
       if (db_num_rows($result)) {
@@ -48,31 +48,31 @@ function scheduler_write($node, $op, $arg) {
       else {
         scheduler_insert($node, $conds);
       }
-    }  
+    }
     else {
       scheduler_insert($node, $conds);
-    }  
+    }
   }
 }
-  
+
 function scheduler_insert($node, $conds) {
-  $conds["nid"] = $node->nid;
-  db_query("INSERT {scheduler} (%s) VALUES (%s)", implode(", ", array_keys($conds)), implode(", ", array_values($conds)));
-}  
+  $conds['nid'] = $node->nid;
+  db_query("INSERT INTO {scheduler} (%s) VALUES (%s)", implode(", ", array_keys($conds)), implode(", ", array_values($conds)));
+}
 
 function scheduler_nodeapi(&$node, $op, &$arg) {
   global $error;
   switch ($op) {
-    case "validate":
+    case 'validate':
 
-      if (user_access("administer nodes")) {
+      if (user_access('administer nodes')) {
         if ($node->scheduler_post) {
           if (!checkdate($node->scheduler_post_month, $node->scheduler_post_day, $node->scheduler_post_year)) {
-            $error["scheduler_post"] = theme("error", t("Invalid date set, automatically adjusted"));
+            $error["scheduler_post"] = theme('error', t("Invalid date set, automatically adjusted"));
           } else {
             $post_date = scheduler_nodetime($node, "post");
             if (time() > $post_date) {
-              $error["scheduler_post"] = theme("error", t("Date in the past"));
+              $error["scheduler_post"] = theme('error', t('Date in the past'));
             }
             // Automatically depublish node if date is fine
             else {
@@ -80,28 +80,28 @@ function scheduler_nodeapi(&$node, $op, &$arg) {
             }
           }
         }
-          
+
         if ($node->scheduler_hide) {
           if (!checkdate($node->scheduler_hide_month, $node->scheduler_hide_day, $node->scheduler_hide_year)) {
             $error["scheduler_hide"] = theme("error", t("Invalid date set, automatically adjusted"));
           } else {
             $hide_date = scheduler_nodetime($node, "hide");
             if (time() > $hide_date) {
-              $error["scheduler_hide"] = theme("error", t("Date in the past"));
+              $error["scheduler_hide"] = theme('error', t("Date in the past"));
             }
           }
         }
         return $error;
-      }  
+      }
       break;
-    case "insert":
+    case 'insert':
       scheduler_write($node, $op, $arg);
       break;
-    case "update":
+    case 'update':
       scheduler_write($node, $op, $arg);
       break;
-    case "form admin":
-      if (user_access("administer nodes")) {
+    case 'form admin':
+      if (user_access('administer nodes')) {
 
         // Build up date components array
         $month_names = array();
@@ -109,11 +109,11 @@ function scheduler_nodeapi(&$node, $op, &$arg) {
           $month_names[$i] = format_date(mktime(0, 0, 0, $i, 1, 1971), 'custom', 'F');
         }
         $date_components = array(
-          "year"   => array("Y", scheduler_range(2004, 2006)),
-          "month"  => array("m", $month_names),
-          "day"    => array("d", scheduler_range(1, 31)),
-          "hour"   => array("H", scheduler_range(0, 23)),
-          "minute" => array("i", scheduler_range(0, 59))
+          "year"   => array('Y', scheduler_range(2004, 2006)),
+          "month"  => array('m', $month_names),
+          "day"    => array('d', scheduler_range(1, 31)),
+          "hour"   => array('H', scheduler_range(0, 23)),
+          "minute" => array('i', scheduler_range(0, 59))
         );
 
         // Form element specs (time, enabled, title, description)
@@ -134,7 +134,7 @@ function scheduler_nodeapi(&$node, $op, &$arg) {
             $form_elements['scheduler_hide'][1] = TRUE;
           }
         }
-        
+
         // Preserve the data set in the DB (if there was no form)
         elseif ($node->nid) {
           $result = db_query("SELECT timestamp_hidden, timestamp_posted FROM {scheduler} WHERE nid = %d", $node->nid);
@@ -148,7 +148,7 @@ function scheduler_nodeapi(&$node, $op, &$arg) {
             $form_elements['scheduler_hide'][1] = TRUE;
           }
         }
-        
+
         // Compose form to post and hide nodes
         $form = '';
         foreach ($form_elements as $fname => $felem) {
@@ -163,14 +163,14 @@ function scheduler_nodeapi(&$node, $op, &$arg) {
       }
   }
 }
-  
+
 function scheduler_cron() {
   // If we are past the posting time, then post.
   $result = db_query("SELECT s.nid, s.timestamp_posted, s.timestamp_hidden FROM {scheduler} s LEFT JOIN {node} n ON s.nid = n.nid WHERE n.status = 0 AND s.timestamp_posted > 0 AND s.timestamp_posted < %d", time());
   $numpost = db_num_rows($result);
   while ($node = db_fetch_object($result)) {
     db_query("UPDATE {node} SET created = %d, changed = %d, status = 1 WHERE nid = %d", $node->timestamp_posted, $node->timestamp_posted, $node->nid);
-    
+
     // No hide information for node, no need to keep record
     if ($node->timestamp_hidden == 0) {
       db_query("DELETE FROM {scheduler} WHERE nid = %d", $node->nid);
@@ -201,17 +201,17 @@ function scheduler_cron() {
 function scheduler_admin() {
 
   $header = array(
-    array("data" => t("title"), "field" => "n.title"),
-    array("data" => t("author"), "field" => "u.name"),
-    array("data" => t("post"), "field" => "s.timestamp_posted"),
-    array("data" => t("hide"), "field" => "s.timestamp_hidden"),
-    array("data" => t("operations"), "colspan" => 2)
+    array('data' => t("title"), "field" => "n.title"),
+    array('data' => t("author"), "field" => "u.name"),
+    array('data' => t("post"), "field" => "s.timestamp_posted"),
+    array('data' => t("hide"), "field" => "s.timestamp_hidden"),
+    array('data' => t("operations"), "colspan" => 2)
   );
 
   // Default ordering
   if (!isset($_GET["order"]) && !isset($_GET["sort"])) {
-    $_GET["order"] = t("post");
-    $_GET["sort"] = "desc";
+    $_GET["order"] = t('post');
+    $_GET["sort"] = 'desc';
   }
 
   $sql = "SELECT n.nid, n.uid, n.status, u.name, n.title, s.timestamp_posted, s.timestamp_hidden FROM {scheduler} s LEFT JOIN {node} n ON s.nid = n.nid LEFT JOIN {users} u ON n.uid = u.uid" . tablesort_sql($header);
@@ -223,22 +223,22 @@ function scheduler_admin() {
       format_name($node),
       ($node->timestamp_posted ? format_date($node->timestamp_posted) : "&nbsp;"),
       ($node->timestamp_hidden ? format_date($node->timestamp_hidden) : "&nbsp;"),
-      l(t("edit node"), "admin/node/edit/$node->nid"),
-      l(t("delete node"), "admin/node/delete/$node->nid")
+      l(t('edit node'), "admin/node/edit/$node->nid"),
+      l(t('delete node'), "admin/node/delete/$node->nid")
     );
   }
-  
+
   if (count($rows)) {
-    if ($pager = theme("pager", NULL, 50, 0, tablesort_pager())) {
-      $rows[] = array(array("data" => $pager, "colspan" => 6));
+    if ($pager = theme('pager', NULL, 50, 0, tablesort_pager())) {
+      $rows[] = array(array('data' => $pager, 'colspan' => 6));
     }
-  
-    print theme("page", theme("table", $header, $rows));
+
+    print theme('page', theme('table', $header, $rows));
   }
   else {
-    print theme("page", t('There are no scheduled nodes.'));
+    print theme('page', t('There are no scheduled nodes.'));
   }
-}  
+}
 
 // Generates a range for dates between $start and $end, but
 // unlike range(), it starts the array index from $start and not 0
