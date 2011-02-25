@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 function scheduler_install() {
   switch ($GLOBALS['db_type']) {
